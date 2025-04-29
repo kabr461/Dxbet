@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Script Remover</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f4f6fa;
+      color: #222;
+    }
+    h1 {
+      margin: 0 0 1rem;
+      font-size: 1.4rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 35vh;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: monospace;
+      resize: vertical;
+    }
+    button {
+      display: inline-block;
+      margin: 1rem 0;
+      padding: 0.7rem 1.2rem;
+      border: 0;
+      border-radius: 6px;
+      background: #0066cc;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    label {
+      font-weight: 600;
+      margin: 1rem 0 0.4rem;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>&lt;script&gt; Stripper — HTML Cleaner</h1>
+
+  <label for="htmlInput">Paste your original HTML here:</label>
+  <textarea id="htmlInput" placeholder="&lt;!-- drop your markup with scripts inside --&gt;"></textarea>
+
+  <button id="cleanButton">Remove &lt;script&gt; blocks</button>
+
+  <label for="htmlOutput">Result (all &lt;script&gt; blocks removed):</label>
+  <textarea id="htmlOutput" readonly></textarea>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputEl  = document.getElementById('htmlInput');
+      const outputEl = document.getElementById('htmlOutput');
+      const btn      = document.getElementById('cleanButton');
+
+      function stripScripts(html) {
+        return html
+          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/\n{3,}/g, '\n\n');
+      }
+
+      btn.addEventListener('click', () => {
+        outputEl.value = stripScripts(inputEl.value);
+      });
+    });
+  </script>
+
+</body>
+</html>
