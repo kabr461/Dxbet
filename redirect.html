@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <title>Registration Complete</title>
+  <!-- Same UI stylesheet as your reg.html page -->
+  <link rel="stylesheet" href="https://v3.traincdn.com/sys-ui/2.3.144/Mobile/Default/client.css">
+</head>
+<body>
+  <div class="ui-card ui-card--padded">
+    <h1 class="ui-caption ui-caption--size-l">Your Account Details</h1>
+    <p class="ui-caption">Username: <strong id="username"></strong></p>
+    <p class="ui-caption">Password: <strong id="password"></strong></p>
+    <button id="saveBtn" class="ui-button ui-button--theme-accent ui-button--block ui-button--uppercase ui-button--rounded">
+      <span class="ui-button__container">
+        <span class="ui-caption ui-caption--size-m">Save Credentials</span>
+      </span>
+    </button>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Read credentials from URL
+      const params   = new URLSearchParams(window.location.search);
+      const username = params.get('username') || '';
+      const password = params.get('password') || '';
+      document.getElementById('username').textContent = username;
+      document.getElementById('password').textContent = password;
+
+      // Download .txt on click
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        const data = `Username: ${username}\\nPassword: ${password}`;
+        const blob = new Blob([data], { type: 'text/plain' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'credentials.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    });
+  </script>
+</body>
+</html>
