@@ -1,4 +1,5 @@
-// auth.js  — full file with final selectors
+// auth.js  — full file, May 2025 build
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
   getAuth,
@@ -46,7 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (page === 'reg-beautified.html') {                      // one‑click page
     onAuthStateChanged(auth, user => {
       if (user) {
-        window.location.replace('logged-1xcopy-beautified.html');
+        /* Already signed in (or just registered) → show creds page */
+        window.location.replace('redirect.html');
       } else {
         initRegistration();
       }
@@ -90,7 +92,7 @@ function initRegistration() {
 }
 
 async function handleRegister() {
-  /* Grab country & currency (both use same class) */
+  /* Country & currency share the same class → grab both in DOM order */
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
@@ -98,7 +100,6 @@ async function handleRegister() {
   const country  = captions[0] || 'Unknown';
   const currency = captions[1] || 'Unknown';
 
-  // Optional: force a currency choice
   if (!currency || currency === 'Select currency') {
     return alert('Please choose a currency first.');
   }
@@ -112,11 +113,7 @@ async function handleRegister() {
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
 
-    await setDoc(doc(db, 'users', user.uid), {
-      username,
-      country,
-      currency
-    });
+    await setDoc(doc(db, 'users', user.uid), { username, country, currency });
 
     sessionStorage.setItem('genUsername', username);
     sessionStorage.setItem('genPassword', password);
@@ -144,7 +141,7 @@ function initRedirect() {
       alert('Credentials copied to clipboard!');
     });
 
-  /* Go‑Back button – id="b" or class="back" */
+  /* Go‑Back button – id="b" or fallback class="back" */
   const backBtn = document.getElementById('b') || document.querySelector('.back');
   backBtn?.addEventListener('click', () => {
     sessionStorage.removeItem('genUsername');
@@ -155,7 +152,6 @@ function initRedirect() {
 
 /* ───── 4) logged‑in pages – Log‑out hook ───── */
 function initDashboardLog() {
-  /* match any nav button whose visible text includes “log out” */
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
