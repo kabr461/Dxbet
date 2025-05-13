@@ -120,6 +120,7 @@ async function registerUser() {
 
 /* ───── 3) Logged-in dashboard ───── */
 function initLoggedInPage() {
+  console.log("⚙️ initLoggedInPage() running; newUserUsername=", localStorage.getItem('newUserUsername'));
   // show credential modal once
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
