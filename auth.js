@@ -1,4 +1,4 @@
-// auth.js – consolidated one-click signup + modal credential overlay
+// auth.js – Debug build with extensive logging
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -14,7 +14,10 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ───── Firebase config ───── */
+/* ───── Module Load ───── */
+console.log("✅ auth.js module loaded on", window.location.pathname);
+
+/* ───── Firebase Initialization ───── */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -29,15 +32,19 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-// keep the session across reloads and restarts
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+/* Persist user session across reloads / restarts */
+setPersistence(auth, browserLocalPersistence).catch(err => {
+  console.error("❌ setPersistence error:", err);
+});
 
 /* ───── Router ───── */
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
+  console.log("📄 DOMContentLoaded, current page:", page);
 
   if (page === '1xcopy-beautified.html') {
     onAuthStateChanged(auth, user => {
+      console.log("👤 onAuthStateChanged on main:", user);
       if (user) {
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
@@ -47,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
+      console.log("👤 onAuthStateChanged on reg page:", user);
       if (user) {
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
@@ -57,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (page === 'logged-1xcopy-beautified.html' ||
              page === 'logged-menu.html') {
     onAuthStateChanged(auth, user => {
+      console.log("👤 onAuthStateChanged on dashboard:", user);
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
       } else {
@@ -66,62 +75,94 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ───── 1) Logged-out main – “Register” button ───── */
+/* ───── 1) Logged-out main – “Register” button hook ───── */
 function hookRegisterButton() {
-  document
-    .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
-    ?.addEventListener('click', () => {
-      window.location.href = 'reg-beautified.html';
-    });
+  console.log("🔎 hookRegisterButton()");
+  const btn = document.querySelector(
+    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
+  );
+  console.log("   found Register button:", btn);
+  if (!btn) {
+    console.error("❌ Register button not found on 1xcopy-beautified.html!");
+    return;
+  }
+  btn.addEventListener('click', () => {
+    console.log("➡️ Register button clicked, navigating to reg-beautified.html");
+    window.location.href = 'reg-beautified.html';
+  });
 }
 
 /* ───── 2) One-click registration page ───── */
 function hookOneClickRegister() {
-  document
-    .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
-    ?.addEventListener('click', registerUser);
+  console.log("🔎 hookOneClickRegister()");
+  // Try the known selector, fallback to any button with exact text "Register"
+  let btn = document.querySelector(
+    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
+  );
+  if (!btn) {
+    btn = Array.from(document.querySelectorAll('button'))
+               .find(b => b.textContent.trim().toLowerCase() === 'register');
+  }
+  console.log("   found One-Click Register button:", btn);
+  if (!btn) {
+    console.error("❌ One-Click Register button not found on reg-beautified.html!");
+    return;
+  }
+  btn.addEventListener('click', registerUser);
 }
 
 async function registerUser() {
-  // grab country & currency (two spans share the same class)
+  console.log("🔎 registerUser() called");
+  // Grab country & currency (two spans share same class)
   const caps = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
+  console.log("   captions:", caps);
 
   const country  = caps[0] || 'Unknown';
   const currency = caps[1] || 'Unknown';
+  console.log(`   country=${country}, currency=${currency}`);
 
   if (!currency || currency === 'Select currency') {
+    console.warn("⚠️ Currency not selected");
     return alert('Please choose a currency first.');
   }
 
-  // generate credentials
+  // Generate credentials
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
   const email    = `${username}@autogen.local`;
+  console.log(`   generated username=${username}, password=${password}, email=${email}`);
 
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
+    console.log("✅ Firebase user created, uid=", user.uid);
 
-    // save user profile
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
+    console.log("✅ Firestore profile saved");
 
-    // store for modal
+    // Store for modal on dashboard
+    console.log("🔒 Storing creds to localStorage");
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
 
+    console.log("➡️ Redirecting to dashboard");
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
-    console.error('Registration error:', err);
+    console.error("❌ Registration error:", err);
     alert('Registration failed: ' + err.message);
   }
 }
 
-/* ───── 3) Logged-in dashboard ───── */
+/* ───── 3) Dashboard logged-in page ───── */
 function initLoggedInPage() {
-  console.log("⚙️ initLoggedInPage() running; newUserUsername=", localStorage.getItem('newUserUsername'));
-  // show credential modal once
+  console.log(
+    "⚙️ initLoggedInPage() running; newUserUsername=",
+    localStorage.getItem('newUserUsername')
+  );
+
+  // Show credential modal once if credentials present
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
   if (u) {
@@ -130,18 +171,22 @@ function initLoggedInPage() {
     localStorage.removeItem('newUserPassword');
   }
 
-  // hook logout buttons
+  // Hook logout buttons
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
     if (btn.textContent.trim().toLowerCase().includes('log out')) {
-      btn.addEventListener('click', () => auth.signOut());
+      btn.addEventListener('click', () => {
+        console.log("🔒 User clicked Log out – signing out");
+        auth.signOut();
+      });
     }
   });
 }
 
-/* ───── modal to display new credentials ───── */
+/* ───── Modal to display new credentials ───── */
 function showCredsModal(username, password) {
+  console.log("🔔 showCredsModal()", username, password);
   const modal = document.createElement('div');
   modal.innerHTML = `
     <div style="
@@ -191,14 +236,12 @@ function showCredsModal(username, password) {
   `;
   document.body.appendChild(modal);
 
-  // copy credentials
   modal.querySelector('#saveCredsBtn').onclick = () => {
     navigator.clipboard.writeText(`Username: ${username}\nPassword: ${password}`)
       .then(() => alert('Credentials copied to clipboard!'))
       .catch(() => alert('Copy failed—please copy manually.'));
   };
 
-  // close the modal
   modal.querySelector('#closeCredModal').onclick = () => {
     document.body.removeChild(modal);
   };
