@@ -1,7 +1,6 @@
 /* =========================================================================
-   auth.js  –  May 2025 build  •  One‑click signup + persistent login flow
+   auth.js – stable “redirect page first” flow
    ========================================================================= */
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
   getAuth,
@@ -16,7 +15,7 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ------------- 1. Firebase config (must match your project) ------------- */
+/* ---- Firebase config ---- */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -31,14 +30,13 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-/* Keep the session across reloads / browser restarts */
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-/* ------------- 2. Page‑level router ------------- */
+/* ---- Router ---- */
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
 
-  if (page === '1xcopy-beautified.html') {                          // logged‑out main
+  if (page === '1xcopy-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
         window.location.replace('logged-1xcopy-beautified.html');
@@ -47,17 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-  } else if (page === 'reg-beautified.html') {                      // one‑click page
+  } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
-        /* Already signed in (was just created) → open logged page */
-        window.location.replace('logged-1xcopy-beautified.html');
+        /* Account already exists (just created) → show creds page */
+        window.location.replace('redirect.html');
       } else {
         initRegistration();
       }
     });
 
-  } else if (page === 'redirect.html') {                            // creds overlay
+  } else if (page === 'redirect.html') {
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
@@ -67,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
   } else if (page === 'logged-1xcopy-beautified.html' ||
-             page === 'logged-menu.html') {                         // logged‑in pages
+             page === 'logged-menu.html') {
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
@@ -78,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ------------- 3. 1xcopy‑beautified.html — “Register” button ------------- */
+/* ---- 1) Main (logged‑out) ---- */
 function initDashboardReg() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -87,7 +85,7 @@ function initDashboardReg() {
     });
 }
 
-/* ------------- 4. reg‑beautified.html — one‑click signup ------------- */
+/* ---- 2) One‑click registration page ---- */
 function initRegistration() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -95,7 +93,7 @@ function initRegistration() {
 }
 
 async function handleRegister() {
-  /* Grab country + currency (same class, country appears first) */
+  /* Country & currency (two spans with the same class) */
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
@@ -107,7 +105,7 @@ async function handleRegister() {
     return alert('Please choose a currency first.');
   }
 
-  /* Auto‑generate credentials */
+  /* Auto‑gen credentials */
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
@@ -118,19 +116,18 @@ async function handleRegister() {
 
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
 
-    /* Stash creds so the logged page knows to open redirect.html */
+    /* Stash creds so redirect.html can show them */
     sessionStorage.setItem('genUsername', username);
     sessionStorage.setItem('genPassword', password);
 
-    /* Go directly to the logged‑in dashboard */
-    window.location.replace('logged-1xcopy-beautified.html');
+    window.location.replace('redirect.html');
   } catch (err) {
     console.error('Registration error:', err);
     alert('Registration failed: ' + err.message);
   }
 }
 
-/* ------------- 5. redirect.html — creds overlay ------------- */
+/* ---- 3) Redirect (credentials) page ---- */
 function initRedirect() {
   const username = sessionStorage.getItem('genUsername');
   const password = sessionStorage.getItem('genPassword');
@@ -147,7 +144,6 @@ function initRedirect() {
       alert('Credentials copied to clipboard!');
     });
 
-  /* Go‑Back button (id="b" or class="back") */
   const backBtn = document.getElementById('b') || document.querySelector('.back');
   backBtn?.addEventListener('click', () => {
     sessionStorage.removeItem('genUsername');
@@ -156,17 +152,8 @@ function initRedirect() {
   });
 }
 
-/* ------------- 6. logged‑in pages — Log‑out + overlay trigger ------------- */
+/* ---- 4) Logged‑in pages ---- */
 function initDashboardLog() {
-  /* Show redirect.html overlay *once* if creds still in sessionStorage */
-  if (sessionStorage.getItem('genUsername') && sessionStorage.getItem('genPassword')) {
-    /* Let the page paint first, then swap */
-    requestAnimationFrame(() => {
-      window.location.href = 'redirect.html';
-    });
-  }
-
-  /* Hook up all “Log out” buttons */
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
