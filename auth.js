@@ -1,4 +1,6 @@
-// auth.js  — full file, May 2025 build
+/* =========================================================================
+   auth.js  –  May 2025 build  •  One‑click signup + persistent login flow
+   ========================================================================= */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -14,7 +16,7 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ───── Firebase config ───── */
+/* ------------- 1. Firebase config (must match your project) ------------- */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -29,9 +31,10 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
+/* Keep the session across reloads / browser restarts */
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-/* ───── File‑name router ───── */
+/* ------------- 2. Page‑level router ------------- */
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
 
@@ -47,14 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (page === 'reg-beautified.html') {                      // one‑click page
     onAuthStateChanged(auth, user => {
       if (user) {
-        /* Already signed in (or just registered) → show creds page */
-        window.location.replace('redirect.html');
+        /* Already signed in (was just created) → open logged page */
+        window.location.replace('logged-1xcopy-beautified.html');
       } else {
         initRegistration();
       }
     });
 
-  } else if (page === 'redirect.html') {                            // creds page
+  } else if (page === 'redirect.html') {                            // creds overlay
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
@@ -75,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ───── 1) logged‑out main – Register button just navigates ───── */
+/* ------------- 3. 1xcopy‑beautified.html — “Register” button ------------- */
 function initDashboardReg() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -84,7 +87,7 @@ function initDashboardReg() {
     });
 }
 
-/* ───── 2) reg‑beautified.html – one‑click registration ───── */
+/* ------------- 4. reg‑beautified.html — one‑click signup ------------- */
 function initRegistration() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -92,7 +95,7 @@ function initRegistration() {
 }
 
 async function handleRegister() {
-  /* Country & currency share the same class → grab both in DOM order */
+  /* Grab country + currency (same class, country appears first) */
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
@@ -115,22 +118,25 @@ async function handleRegister() {
 
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
 
+    /* Stash creds so the logged page knows to open redirect.html */
     sessionStorage.setItem('genUsername', username);
     sessionStorage.setItem('genPassword', password);
-    window.location.replace('redirect.html');
+
+    /* Go directly to the logged‑in dashboard */
+    window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
     console.error('Registration error:', err);
     alert('Registration failed: ' + err.message);
   }
 }
 
-/* ───── 3) redirect.html – show creds + buttons ───── */
+/* ------------- 5. redirect.html — creds overlay ------------- */
 function initRedirect() {
   const username = sessionStorage.getItem('genUsername');
   const password = sessionStorage.getItem('genPassword');
 
   if (!username || !password)
-    return window.location.replace('1xcopy-beautified.html');
+    return window.location.replace('logged-1xcopy-beautified.html');
 
   document.querySelector('.show-username').textContent = username;
   document.querySelector('.show-password').textContent = password;
@@ -141,7 +147,7 @@ function initRedirect() {
       alert('Credentials copied to clipboard!');
     });
 
-  /* Go‑Back button – id="b" or fallback class="back" */
+  /* Go‑Back button (id="b" or class="back") */
   const backBtn = document.getElementById('b') || document.querySelector('.back');
   backBtn?.addEventListener('click', () => {
     sessionStorage.removeItem('genUsername');
@@ -150,8 +156,17 @@ function initRedirect() {
   });
 }
 
-/* ───── 4) logged‑in pages – Log‑out hook ───── */
+/* ------------- 6. logged‑in pages — Log‑out + overlay trigger ------------- */
 function initDashboardLog() {
+  /* Show redirect.html overlay *once* if creds still in sessionStorage */
+  if (sessionStorage.getItem('genUsername') && sessionStorage.getItem('genPassword')) {
+    /* Let the page paint first, then swap */
+    requestAnimationFrame(() => {
+      window.location.href = 'redirect.html';
+    });
+  }
+
+  /* Hook up all “Log out” buttons */
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
