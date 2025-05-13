@@ -1,5 +1,5 @@
 /* =========================================================================
-   auth.js – “logged page first, then redirect.html” flow
+   auth.js  –  One‑click signup → dashboard → credential sheet (once)
    ========================================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -41,17 +41,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (user) {
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
-        initDashboardReg();
+        hookRegisterButton();
       }
     });
 
   } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
-        /* Account already exists (just created) → open dashboard */
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
-        initRegistration();
+        hookOneClickRegister();
       }
     });
 
@@ -60,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
       } else {
-        initRedirect();
+        initRedirectPage();
       }
     });
 
@@ -70,14 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
       } else {
-        initDashboardLog();
+        initLoggedInPage();
       }
     });
   }
 });
 
-/* ---- 1) Main (logged‑out) ---- */
-function initDashboardReg() {
+/* ---- 1. Logged‑out main ---- */
+function hookRegisterButton() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
     ?.addEventListener('click', () => {
@@ -85,27 +84,26 @@ function initDashboardReg() {
     });
 }
 
-/* ---- 2) One‑click registration page ---- */
-function initRegistration() {
+/* ---- 2. One‑click registration page ---- */
+function hookOneClickRegister() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
-    ?.addEventListener('click', handleRegister);
+    ?.addEventListener('click', registerUser);
 }
 
-async function handleRegister() {
-  /* Country & currency (two spans share same class) */
-  const captions = Array.from(
+async function registerUser() {
+  /* Get country & currency (same class) */
+  const text = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
 
-  const country  = captions[0] || 'Unknown';
-  const currency = captions[1] || 'Unknown';
+  const country  = text[0] || 'Unknown';
+  const currency = text[1] || 'Unknown';
 
   if (!currency || currency === 'Select currency') {
     return alert('Please choose a currency first.');
   }
 
-  /* Auto‑generate credentials */
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
@@ -116,11 +114,11 @@ async function handleRegister() {
 
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
 
-    /* Stash creds for redirect.html */
-    sessionStorage.setItem('genUsername', username);
-    sessionStorage.setItem('genPassword', password);
+    /* Store data for one‑time redirect sheet (localStorage = origin‑wide) */
+    localStorage.setItem('newUserUsername', username);
+    localStorage.setItem('newUserPassword', password);
+    localStorage.setItem('showCredSheet', 'yes');
 
-    /* Go directly to the dashboard */
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
     console.error('Registration error:', err);
@@ -128,13 +126,38 @@ async function handleRegister() {
   }
 }
 
-/* ---- 3) Redirect (credentials) page ---- */
-function initRedirect() {
-  const username = sessionStorage.getItem('genUsername');
-  const password = sessionStorage.getItem('genPassword');
+/* ---- 3. logged-1xcopy-beautified.html ---- */
+function initLoggedInPage() {
+  /* Only immediately after signup */
+  if (localStorage.getItem('showCredSheet') === 'yes') {
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.location.href = 'redirect.html';
+      }, 50);        // wait one paint so the dashboard flashes first
+    });
+  }
 
-  if (!username || !password)
-    return window.location.replace('logged-1xcopy-beautified.html');
+  /* Wire all Log‑out buttons and wipe flags */
+  document.querySelectorAll(
+    '.navigation-menu-section-item-button.navigation-menu-section-item__link'
+  ).forEach(btn => {
+    if (btn.textContent.trim().toLowerCase().includes('log out')) {
+      btn.addEventListener('click', () => {
+        ['newUserUsername', 'newUserPassword', 'showCredSheet']
+          .forEach(key => localStorage.removeItem(key));
+        auth.signOut();
+      });
+    }
+  });
+}
+
+/* ---- 4. redirect.html (credential sheet) ---- */
+function initRedirectPage() {
+  const username = localStorage.getItem('newUserUsername') || '';
+  const password = localStorage.getItem('newUserPassword') || '';
+
+  /* Flag consumed so this page never auto‑opens again */
+  localStorage.setItem('showCredSheet', 'no');
 
   document.querySelector('.show-username').textContent = username;
   document.querySelector('.show-password').textContent = password;
@@ -147,30 +170,6 @@ function initRedirect() {
 
   const backBtn = document.getElementById('b') || document.querySelector('.back');
   backBtn?.addEventListener('click', () => {
-    sessionStorage.removeItem('genUsername');
-    sessionStorage.removeItem('genPassword');
     window.location.replace('logged-1xcopy-beautified.html');
-  });
-}
-
-/* ---- 4) Logged‑in pages ---- */
-function initDashboardLog() {
-  /* After the dashboard fully loads, pop redirect.html once */
-  if (sessionStorage.getItem('genUsername') && sessionStorage.getItem('genPassword')) {
-    window.addEventListener('load', () => {
-      // Small delay ensures first paint is visible before swap
-      setTimeout(() => {
-        window.location.href = 'redirect.html';
-      }, 50);
-    });
-  }
-
-  /* Hook up all “Log out” buttons */
-  document.querySelectorAll(
-    '.navigation-menu-section-item-button.navigation-menu-section-item__link'
-  ).forEach(btn => {
-    if (btn.textContent.trim().toLowerCase().includes('log out')) {
-      btn.addEventListener('click', () => auth.signOut());
-    }
   });
 }
