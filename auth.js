@@ -161,7 +161,7 @@ function initDashboardLog() {
       // Small delay ensures first paint is visible before swap
       setTimeout(() => {
         window.location.href = 'redirect.html';
-      }, 500);
+      }, 50);
     });
   }
 
