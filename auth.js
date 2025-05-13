@@ -1,6 +1,4 @@
-/* =========================================================================
-   auth.js  –  One‑click signup → dashboard → credential sheet (once)
-   ========================================================================= */
+// auth.js – consolidated one-click signup + modal credential overlay
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
   getAuth,
@@ -15,7 +13,7 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ---- Firebase config ---- */
+/* Firebase config */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -26,16 +24,16 @@ const firebaseConfig = {
   measurementId:     "G-3PLM5LFY6X"
 };
 
-const app  = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
+const db = getFirestore(app);
 
+// Persist session
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-/* ---- Router ---- */
+// Router
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
-
   if (page === '1xcopy-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -44,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hookRegisterButton();
       }
     });
-
   } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -53,18 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hookOneClickRegister();
       }
     });
-
-  } else if (page === 'redirect.html') {
-    onAuthStateChanged(auth, user => {
-      if (!user) {
-        window.location.replace('1xcopy-beautified.html');
-      } else {
-        initRedirectPage();
-      }
-    });
-
-  } else if (page === 'logged-1xcopy-beautified.html' ||
-             page === 'logged-menu.html') {
+  } else if (page === 'logged-1xcopy-beautified.html' || page === 'logged-menu.html') {
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.replace('1xcopy-beautified.html');
@@ -75,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ---- 1. Logged‑out main ---- */
+// Main logged-out page
 function hookRegisterButton() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -84,7 +70,7 @@ function hookRegisterButton() {
     });
 }
 
-/* ---- 2. One‑click registration page ---- */
+// One-click registration page
 function hookOneClickRegister() {
   document
     .querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase')
@@ -92,84 +78,79 @@ function hookOneClickRegister() {
 }
 
 async function registerUser() {
-  /* Get country & currency (same class) */
-  const text = Array.from(
-    document.querySelectorAll('.ui-field-select-modal-trigger__caption')
-  ).map(el => el.textContent.trim());
-
-  const country  = text[0] || 'Unknown';
-  const currency = text[1] || 'Unknown';
-
+  // Grab country & currency
+  const caps = Array.from(document.querySelectorAll('.ui-field-select-modal-trigger__caption'))
+                 .map(el => el.textContent.trim());
+  const country = caps[0] || 'Unknown';
+  const currency = caps[1] || 'Unknown';
   if (!currency || currency === 'Select currency') {
     return alert('Please choose a currency first.');
   }
-
-  const uidPart  = Math.random().toString(36).slice(2, 8);
+  // Generate creds
+  const uidPart = Math.random().toString(36).slice(2,8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
-  const email    = `${username}@autogen.local`;
-
+  const email = `${username}@autogen.local`;
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
-
+    // Save profile
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
-
-    /* Store data for one‑time redirect sheet (localStorage = origin‑wide) */
+    // Store for modal
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
-    localStorage.setItem('showCredSheet', 'yes');
-
     window.location.replace('logged-1xcopy-beautified.html');
-  } catch (err) {
+  } catch(err) {
     console.error('Registration error:', err);
     alert('Registration failed: ' + err.message);
   }
 }
 
-/* ---- 3. logged-1xcopy-beautified.html ---- */
+// Dashboard logged-in page
 function initLoggedInPage() {
-  /* Only immediately after signup */
-  if (localStorage.getItem('showCredSheet') === 'yes') {
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        window.location.href = 'redirect.html';
-      }, 50);        // wait one paint so the dashboard flashes first
-    });
+  // Show creds modal once
+  const u = localStorage.getItem('newUserUsername');
+  const p = localStorage.getItem('newUserPassword');
+  if (u) {
+    showCredsModal(u, p);
+    localStorage.removeItem('newUserUsername');
+    localStorage.removeItem('newUserPassword');
   }
-
-  /* Wire all Log‑out buttons and wipe flags */
-  document.querySelectorAll(
-    '.navigation-menu-section-item-button.navigation-menu-section-item__link'
-  ).forEach(btn => {
-    if (btn.textContent.trim().toLowerCase().includes('log out')) {
-      btn.addEventListener('click', () => {
-        ['newUserUsername', 'newUserPassword', 'showCredSheet']
-          .forEach(key => localStorage.removeItem(key));
-        auth.signOut();
-      });
-    }
-  });
+  // Logout hook
+  document.querySelectorAll('.navigation-menu-section-item-button.navigation-menu-section-item__link')
+    .forEach(btn => {
+      if (btn.textContent.trim().toLowerCase().includes('log out')) {
+        btn.addEventListener('click', () => auth.signOut());
+      }
+    });
 }
 
-/* ---- 4. redirect.html (credential sheet) ---- */
-function initRedirectPage() {
-  const username = localStorage.getItem('newUserUsername') || '';
-  const password = localStorage.getItem('newUserPassword') || '';
-
-  /* Flag consumed so this page never auto‑opens again */
-  localStorage.setItem('showCredSheet', 'no');
-
-  document.querySelector('.show-username').textContent = username;
-  document.querySelector('.show-password').textContent = password;
-
-  document.querySelector('.show-save-btn')
-    ?.addEventListener('click', () => {
-      navigator.clipboard.writeText(`Username: ${username}\nPassword: ${password}`);
-      alert('Credentials copied to clipboard!');
-    });
-
-  const backBtn = document.getElementById('b') || document.querySelector('.back');
-  backBtn?.addEventListener('click', () => {
-    window.location.replace('logged-1xcopy-beautified.html');
-  });
+// Show modal
+function showCredsModal(username, password) {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div style="
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.6);display:flex;
+      align-items:center;justify-content:center;
+      z-index:9999;
+    ">
+      <div style="
+        background:#fff;padding:1.5rem;border-radius:8px;
+        max-width:320px;text-align:center;font-family:sans-serif;
+      ">
+        <h2>Your new account</h2>
+        <p><strong>Username:</strong> <code>${username}</code></p>
+        <p><strong>Password:</strong> <code>${password}</code></p>
+        <button id="closeCredModal" style="
+          margin-top:1rem;padding:0.5rem 1rem;
+          border:none;background:#007bff;color:#fff;
+          border-radius:4px;cursor:pointer;
+        ">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#closeCredModal').onclick = () => {
+    document.body.removeChild(modal);
+  };
 }
