@@ -1,5 +1,5 @@
 /* =========================================================================
-   auth.js – stable “redirect page first” flow
+   auth.js – “logged page first, then redirect.html” flow
    ========================================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -48,8 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
       if (user) {
-        /* Account already exists (just created) → show creds page */
-        window.location.replace('redirect.html');
+        /* Account already exists (just created) → open dashboard */
+        window.location.replace('logged-1xcopy-beautified.html');
       } else {
         initRegistration();
       }
@@ -93,7 +93,7 @@ function initRegistration() {
 }
 
 async function handleRegister() {
-  /* Country & currency (two spans with the same class) */
+  /* Country & currency (two spans share same class) */
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
@@ -105,7 +105,7 @@ async function handleRegister() {
     return alert('Please choose a currency first.');
   }
 
-  /* Auto‑gen credentials */
+  /* Auto‑generate credentials */
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
@@ -116,11 +116,12 @@ async function handleRegister() {
 
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
 
-    /* Stash creds so redirect.html can show them */
+    /* Stash creds for redirect.html */
     sessionStorage.setItem('genUsername', username);
     sessionStorage.setItem('genPassword', password);
 
-    window.location.replace('redirect.html');
+    /* Go directly to the dashboard */
+    window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
     console.error('Registration error:', err);
     alert('Registration failed: ' + err.message);
@@ -154,6 +155,17 @@ function initRedirect() {
 
 /* ---- 4) Logged‑in pages ---- */
 function initDashboardLog() {
+  /* After the dashboard fully loads, pop redirect.html once */
+  if (sessionStorage.getItem('genUsername') && sessionStorage.getItem('genPassword')) {
+    window.addEventListener('load', () => {
+      // Small delay ensures first paint is visible before swap
+      setTimeout(() => {
+        window.location.href = 'redirect.html';
+      }, 500);
+    });
+  }
+
+  /* Hook up all “Log out” buttons */
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
