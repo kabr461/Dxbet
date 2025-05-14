@@ -16,18 +16,27 @@ import {
 
 /* ───── Firebase init ───── */
 const firebaseConfig = {
-  apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
-  authDomain:        "bettingwebsite-6b685.firebaseapp.com",
-  projectId:         "bettingwebsite-6b685",
-  storageBucket:     "bettingwebsite-6b685.appspot.com",
+  apiKey: "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
+  authDomain: "bettingwebsite-6b685.firebaseapp.com",
+  projectId: "bettingwebsite-6b685",
+  storageBucket: "bettingwebsite-6b685.appspot.com",
   messagingSenderId: "44929634591",
-  appId:             "1:44929634591:web:99d7604a031b4a4f99a02a",
-  measurementId:     "G-3PLM5LFY6X"
+  appId: "1:44929634591:web:99d7604a031b4a4f99a02a",
+  measurementId: "G-3PLM5LFY6X"
 };
-const app  = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
+const db = getFirestore(app);
 setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+/* ───── Debounce utility ───── */
+function debounce(fn, ms) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), ms);
+  };
+}
 
 /* ───── Page router ───── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -42,20 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
         hookMainRegister();
       }
     });
-
   } else if (page === 'reg-beautified.html') {
     // one-click signup page
     onAuthStateChanged(auth, user => {
       if (user) {
-        // if somehow already signed in
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
         hookDirectRegister();
       }
     });
-
-  } else if (page === 'logged-1xcopy-beautified.html' ||
-             page === 'logged-menu.html') {
+  } else if (page === 'logged-1xcopy-beautified.html' || page === 'logged-menu.html') {
     // dashboard pages
     onAuthStateChanged(auth, user => {
       if (!user) {
@@ -85,10 +90,10 @@ function hookDirectRegister() {
     'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
   );
   if (!btn) return;
-  btn.addEventListener('click', async e => {
+  btn.addEventListener('click', debounce(async e => {
     e.preventDefault();
     await registerUser();
-  });
+  }, 1000)); // 1-second debounce
 }
 
 async function registerUser() {
@@ -96,30 +101,41 @@ async function registerUser() {
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
-  const country  = captions[0] || 'Unknown';
+  const country = captions[0] || 'Unknown';
   const currency = captions[1] || 'Unknown';
   if (!currency || currency === 'Select currency') {
     return alert('Please choose a currency first.');
   }
 
   // 2) Generate credentials
-  const uidPart  = Math.random().toString(36).slice(2, 8);
+  const uidPart = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
-  const email    = `${username}@autogen.local`;
+  const email = `${username}@autogen.local`;
 
   try {
     // 3) Create Firebase Auth user
+    console.log('Attempting to create user with email:', email);
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
+    console.log('User created with UID:', user.uid);
 
     // 4) Save profile in Firestore
+    console.log('Saving user profile to Firestore...');
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
+    console.log('Profile saved successfully');
 
     // 5) Stash for modal
+    console.log('Saving credentials to localStorage:', { username, password });
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
 
+    // Verify storage
+    const storedUsername = localStorage.getItem('newUserUsername');
+    const storedPassword = localStorage.getItem('newUserPassword');
+    console.log('Stored in localStorage:', { storedUsername, storedPassword });
+
     // 6) Go to dashboard
+    console.log('Redirecting to dashboard...');
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
     console.error('Registration failed:', err);
@@ -129,16 +145,23 @@ async function registerUser() {
 
 /* ───── 3) Dashboard init ───── */
 function initDashboard() {
-  // A) Show modal once if creds exist
+  // A) Log localStorage contents for debugging
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
+  console.log('Checking localStorage in initDashboard:', { newUserUsername: u, newUserPassword: p });
+
+  // B) Show modal once if creds exist
   if (u && p) {
+    console.log('Showing credentials modal with:', { username: u, password: p });
     showCredsModal(u, p);
     localStorage.removeItem('newUserUsername');
     localStorage.removeItem('newUserPassword');
+    console.log('Cleared localStorage after modal display');
+  } else {
+    console.log('No credentials found in localStorage, skipping modal');
   }
 
-  // B) Hook up logout
+  // C) Hook up logout
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
