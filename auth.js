@@ -27,7 +27,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+setPersistence(auth, browserLocalPersistence).catch(err => console.error('Persistence error:', err));
 
 /* ───── Debounce utility ───── */
 function debounce(fn, ms) {
@@ -40,32 +40,36 @@ function debounce(fn, ms) {
 
 /* ───── Page router ───── */
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded, page:', window.location.pathname);
   const page = window.location.pathname.split('/').pop();
 
   if (page === '1xcopy-beautified.html') {
-    // logged-out main
     onAuthStateChanged(auth, user => {
       if (user) {
+        console.log('User logged in, redirecting to dashboard');
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
+        console.log('No user, staying on main page');
         hookMainRegister();
       }
     });
   } else if (page === 'reg-beautified.html') {
-    // one-click signup page
     onAuthStateChanged(auth, user => {
       if (user) {
+        console.log('User already logged in, redirecting to dashboard');
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
+        console.log('No user, setting up registration');
         hookDirectRegister();
       }
     });
   } else if (page === 'logged-1xcopy-beautified.html' || page === 'logged-menu.html') {
-    // dashboard pages
     onAuthStateChanged(auth, user => {
       if (!user) {
+        console.log('No user, redirecting to main page');
         window.location.replace('1xcopy-beautified.html');
       } else {
+        console.log('User logged in, initializing dashboard');
         initDashboard();
       }
     });
@@ -77,7 +81,11 @@ function hookMainRegister() {
   const btn = document.querySelector(
     'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
   );
-  if (!btn) return;
+  if (!btn) {
+    console.error('Main register button not found');
+    return;
+  }
+  console.log('Hooking main register button');
   btn.addEventListener('click', e => {
     e.preventDefault();
     window.location.href = 'reg-beautified.html';
@@ -89,14 +97,20 @@ function hookDirectRegister() {
   const btn = document.querySelector(
     'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
   );
-  if (!btn) return;
+  if (!btn) {
+    console.error('Register button not found');
+    return;
+  }
+  console.log('Hooking register button');
   btn.addEventListener('click', debounce(async e => {
+    console.log('Register button clicked');
     e.preventDefault();
     await registerUser();
-  }, 1000)); // 1-second debounce
+  }, 1000));
 }
 
 async function registerUser() {
+  console.log('registerUser started');
   // 1) Grab selected country & currency
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
@@ -104,6 +118,7 @@ async function registerUser() {
   const country = captions[0] || 'Unknown';
   const currency = captions[1] || 'Unknown';
   if (!currency || currency === 'Select currency') {
+    console.log('Currency not selected');
     return alert('Please choose a currency first.');
   }
 
@@ -111,7 +126,7 @@ async function registerUser() {
   const uidPart = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
-  const email = `${username}@autogen.local`;
+  const email = `user_${uidPart}_${Date.now()}@autogen.local`; // Unique email
 
   try {
     // 3) Create Firebase Auth user
@@ -119,20 +134,24 @@ async function registerUser() {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     console.log('User created with UID:', user.uid);
 
-    // 4) Save profile in Firestore
-    console.log('Saving user profile to Firestore...');
-    await setDoc(doc(db, 'users', user.uid), { username, country, currency });
-    console.log('Profile saved successfully');
-
-    // 5) Stash for modal
+    // 4) Save credentials to localStorage (before Firestore, to ensure modal)
     console.log('Saving credentials to localStorage:', { username, password });
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
+    console.log('Stored in localStorage:', {
+      storedUsername: localStorage.getItem('newUserUsername'),
+      storedPassword: localStorage.getItem('newUserPassword')
+    });
 
-    // Verify storage
-    const storedUsername = localStorage.getItem('newUserUsername');
-    const storedPassword = localStorage.getItem('newUserPassword');
-    console.log('Stored in localStorage:', { storedUsername, storedPassword });
+    // 5) Save profile in Firestore
+    console.log('Saving user profile to Firestore...');
+    try {
+      await setDoc(doc(db, 'users', user.uid), { username, country, currency });
+      console.log('Profile saved successfully');
+    } catch (firestoreErr) {
+      console.error('Firestore write failed:', firestoreErr);
+      // Continue to redirect, as Firestore is optional for modal
+    }
 
     // 6) Go to dashboard
     console.log('Redirecting to dashboard...');
@@ -145,12 +164,11 @@ async function registerUser() {
 
 /* ───── 3) Dashboard init ───── */
 function initDashboard() {
-  // A) Log localStorage contents for debugging
+  console.log('initDashboard running');
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
   console.log('Checking localStorage in initDashboard:', { newUserUsername: u, newUserPassword: p });
 
-  // B) Show modal once if creds exist
   if (u && p) {
     console.log('Showing credentials modal with:', { username: u, password: p });
     showCredsModal(u, p);
@@ -161,7 +179,6 @@ function initDashboard() {
     console.log('No credentials found in localStorage, skipping modal');
   }
 
-  // C) Hook up logout
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
