@@ -1,18 +1,16 @@
-// auth.js – final flow: one-click signup → dashboard → modal once
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js';
 import {
   getAuth,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence
-} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
+} from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js';
 import {
   getFirestore,
   doc,
   setDoc
-} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+} from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js';
 
 /* ───── Firebase init ───── */
 const firebaseConfig = {
@@ -111,7 +109,6 @@ function hookDirectRegister() {
 
 async function registerUser() {
   console.log('registerUser started');
-  // 1) Grab selected country & currency
   const captions = Array.from(
     document.querySelectorAll('.ui-field-select-modal-trigger__caption')
   ).map(el => el.textContent.trim());
@@ -122,19 +119,16 @@ async function registerUser() {
     return alert('Please choose a currency first.');
   }
 
-  // 2) Generate credentials
   const uidPart = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
-  const email = `user_${uidPart}_${Date.now()}@autogen.local`; // Unique email
+  const email = `user_${uidPart}_${Date.now()}@autogen.local`;
 
   try {
-    // 3) Create Firebase Auth user
     console.log('Attempting to create user with email:', email);
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     console.log('User created with UID:', user.uid);
 
-    // 4) Save credentials to localStorage (before Firestore, to ensure modal)
     console.log('Saving credentials to localStorage:', { username, password });
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
@@ -143,21 +137,23 @@ async function registerUser() {
       storedPassword: localStorage.getItem('newUserPassword')
     });
 
-    // 5) Save profile in Firestore
     console.log('Saving user profile to Firestore...');
     try {
-      await setDoc(doc(db, 'users', user.uid), { username, country, currency });
+      await setDoc(doc(db, 'users', user.uid), { username, country, currency }, { merge: true });
       console.log('Profile saved successfully');
     } catch (firestoreErr) {
-      console.error('Firestore write failed:', firestoreErr);
-      // Continue to redirect, as Firestore is optional for modal
+      console.error('Firestore write failed:', {
+        message: firestoreErr.message,
+        code: firestoreErr.code
+      });
+      alert('Failed to save profile: ' + (firestoreErr.message || 'Unknown Firestore error'));
+      throw new Error('Firestore write failed');
     }
 
-    // 6) Go to dashboard
     console.log('Redirecting to dashboard...');
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
-    console.error('Registration failed:', err);
+    console.error('Registration failed:', { message: err.message, code: err.code });
     alert('Registration error: ' + err.message);
   }
 }
