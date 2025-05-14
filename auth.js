@@ -1,4 +1,4 @@
-// auth.js – Debug build with preventDefault and detailed logs
+// auth.js – final flow: one-click signup → dashboard → modal once
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -14,10 +14,7 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ─── Module Load ─── */
-console.log("✅ auth.js loaded on", window.location.pathname);
-
-/* ─── Firebase Init ─── */
+/* ───── Firebase init ───── */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -30,155 +27,154 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-setPersistence(auth, browserLocalPersistence)
-  .catch(err => console.error("❌ setPersistence:", err));
+setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-/* ─── Router ─── */
+/* ───── Page router ───── */
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
-  console.log("📄 DOMContentLoaded, page:", page);
 
   if (page === '1xcopy-beautified.html') {
+    // logged-out main
     onAuthStateChanged(auth, user => {
-      console.log("👤 Main onAuthStateChanged:", user);
-      user
-        ? window.location.replace('logged-1xcopy-beautified.html')
-        : hookRegisterButton();
+      if (user) {
+        window.location.replace('logged-1xcopy-beautified.html');
+      } else {
+        hookMainRegister();
+      }
     });
 
   } else if (page === 'reg-beautified.html') {
+    // one-click signup page
     onAuthStateChanged(auth, user => {
-      console.log("👤 Reg page onAuthStateChanged:", user);
-      user
-        ? window.location.replace('logged-1xcopy-beautified.html')
-        : hookOneClickRegister();
+      if (user) {
+        // if somehow already signed in
+        window.location.replace('logged-1xcopy-beautified.html');
+      } else {
+        hookDirectRegister();
+      }
     });
 
   } else if (page === 'logged-1xcopy-beautified.html' ||
              page === 'logged-menu.html') {
+    // dashboard pages
     onAuthStateChanged(auth, user => {
-      console.log("👤 Dashboard onAuthStateChanged:", user);
-      user
-        ? initLoggedInPage()
-        : window.location.replace('1xcopy-beautified.html');
+      if (!user) {
+        window.location.replace('1xcopy-beautified.html');
+      } else {
+        initDashboard();
+      }
     });
   }
 });
 
-/* ─── 1) Main page “Register” hook ─── */
-function hookRegisterButton() {
-  console.log("🔎 hookRegisterButton()");
-  const btn = document.querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase');
-  console.log("   found Main Register btn:", btn);
-  if (!btn) return console.error("❌ Main Register button not found!");
+/* ───── 1) Logged-out main → go to reg page ───── */
+function hookMainRegister() {
+  const btn = document.querySelector(
+    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
+  );
+  if (!btn) return;
   btn.addEventListener('click', e => {
     e.preventDefault();
-    console.log("➡️ go to reg-beautified.html");
     window.location.href = 'reg-beautified.html';
   });
 }
 
-/* ─── 2) One-click registration hook ─── */
-function hookOneClickRegister() {
-  console.log("🔎 hookOneClickRegister()");
-  let btn = document.querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase');
-  if (!btn) {
-    btn = Array.from(document.querySelectorAll('button'))
-               .find(b => b.textContent.trim().toLowerCase() === 'register');
-  }
-  console.log("   found Reg-page button:", btn);
-  if (!btn) return console.error("❌ Reg-page button not found!");
-  btn.addEventListener('click', registerUser);
+/* ───── 2) One-click registration ───── */
+function hookDirectRegister() {
+  const btn = document.querySelector(
+    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
+  );
+  if (!btn) return;
+  btn.addEventListener('click', async e => {
+    e.preventDefault();
+    await registerUser();
+  });
 }
 
-async function registerUser(e) {
-  e.preventDefault();
-  console.log("🔎 registerUser() called");
-
-  const caps = Array.from(document.querySelectorAll('.ui-field-select-modal-trigger__caption'))
-                    .map(el => el.textContent.trim());
-  console.log("   captions:", caps);
-
-  const country  = caps[0] || 'Unknown';
-  const currency = caps[1] || 'Unknown';
-  console.log(`   country=${country}, currency=${currency}`);
-
+async function registerUser() {
+  // 1) Grab selected country & currency
+  const captions = Array.from(
+    document.querySelectorAll('.ui-field-select-modal-trigger__caption')
+  ).map(el => el.textContent.trim());
+  const country  = captions[0] || 'Unknown';
+  const currency = captions[1] || 'Unknown';
   if (!currency || currency === 'Select currency') {
-    console.warn("⚠️ Currency not selected");
     return alert('Please choose a currency first.');
   }
 
+  // 2) Generate credentials
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
   const email    = `${username}@autogen.local`;
-  console.log(`   creds: ${username}/${password} → ${email}`);
 
   try {
+    // 3) Create Firebase Auth user
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
-    console.log("✅ Auth user created uid=", user.uid);
 
+    // 4) Save profile in Firestore
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
-    console.log("✅ Firestore saved profile");
 
-    console.log("🔒 Storing creds to localStorage");
+    // 5) Stash for modal
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
 
-    console.log("➡️ Redirecting to dashboard");
+    // 6) Go to dashboard
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
-    console.error("❌ registerUser error:", err);
-    alert('Registration failed: ' + err.message);
+    console.error('Registration failed:', err);
+    alert('Registration error: ' + err.message);
   }
 }
 
-/* ─── 3) Dashboard – show modal if creds are present ─── */
-function initLoggedInPage() {
-  console.log("⚙️ initLoggedInPage(); newUserUsername=", localStorage.getItem('newUserUsername'));
+/* ───── 3) Dashboard init ───── */
+function initDashboard() {
+  // A) Show modal once if creds exist
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
-  if (u) {
+  if (u && p) {
     showCredsModal(u, p);
     localStorage.removeItem('newUserUsername');
     localStorage.removeItem('newUserPassword');
   }
 
-  document.querySelectorAll('.navigation-menu-section-item-button.navigation-menu-section-item__link')
-    .forEach(btn => {
-      if (btn.textContent.trim().toLowerCase().includes('log out')) {
-        btn.addEventListener('click', () => {
-          console.log("🔒 Logging out");
-          auth.signOut();
-        });
-      }
-    });
+  // B) Hook up logout
+  document.querySelectorAll(
+    '.navigation-menu-section-item-button.navigation-menu-section-item__link'
+  ).forEach(btn => {
+    if (btn.textContent.trim().toLowerCase().includes('log out')) {
+      btn.addEventListener('click', () => auth.signOut());
+    }
+  });
 }
 
-/* ─── Modal overlay ─── */
+/* ───── Modal for credentials ───── */
 function showCredsModal(username, password) {
-  console.log("🔔 showCredsModal()", username, password);
   const modal = document.createElement('div');
   modal.innerHTML = `
     <div style="
       position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); display:flex;
       align-items:center; justify-content:center;
-      z-index:10000; font-family:Arial, sans-serif;
+      z-index:9999; font-family:Arial,sans-serif;
     ">
       <div style="
         background:#fff; padding:2rem; border-radius:8px;
         max-width:360px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3);
         text-align:center;
       ">
-        <h2 style="margin-top:0; font-size:1.5rem; color:#333;">Your New Account</h2>
-        <p style="margin:0.5rem 0; color:#555;"><strong>Username:</strong><br>
+        <h2 style="margin:0 0 1rem; font-size:1.5rem; color:#333;">
+          Your New Account
+        </h2>
+        <p style="margin:0.5rem 0; color:#555;">
+          <strong>Username:</strong><br>
           <code style="
             display:inline-block; padding:0.2rem 0.4rem;
             background:#f4f4f4; border-radius:4px;
           ">${username}</code>
         </p>
-        <p style="margin:0.5rem 0 1.5rem; color:#555;"><strong>Password:</strong><br>
+        <p style="margin:0.5rem 0 1.5rem; color:#555;">
+          <strong>Password:</strong><br>
           <code style="
             display:inline-block; padding:0.2rem 0.4rem;
             background:#f4f4f4; border-radius:4px;
@@ -201,8 +197,8 @@ function showCredsModal(username, password) {
 
   modal.querySelector('#saveCredsBtn').onclick = () => {
     navigator.clipboard.writeText(`Username: ${username}\nPassword: ${password}`)
-      .then(() => alert('Copied to clipboard!'))
-      .catch(() => alert('Copy failed.'));
+      .then(() => alert('Credentials copied to clipboard!'))
+      .catch(() => alert('Copy failed—please copy manually.'));
   };
   modal.querySelector('#closeCredModal').onclick = () => {
     document.body.removeChild(modal);
