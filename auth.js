@@ -1,16 +1,18 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js';
+// auth.js – final flow: one-click signup → dashboard → modal once
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence
-} from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js';
+} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 import {
   getFirestore,
   doc,
   setDoc
-} from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js';
+} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
 /* ───── Firebase init ───── */
 const firebaseConfig = {
@@ -25,7 +27,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-setPersistence(auth, browserLocalPersistence).catch(err => console.error('Persistence error:', err));
+setPersistence(auth, browserLocalPersistence).catch(console.error);
 
 /* ───── Debounce utility ───── */
 function debounce(fn, ms) {
@@ -38,36 +40,32 @@ function debounce(fn, ms) {
 
 /* ───── Page router ───── */
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded, page:', window.location.pathname);
   const page = window.location.pathname.split('/').pop();
 
   if (page === '1xcopy-beautified.html') {
+    // logged-out main
     onAuthStateChanged(auth, user => {
       if (user) {
-        console.log('User logged in, redirecting to dashboard');
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
-        console.log('No user, staying on main page');
         hookMainRegister();
       }
     });
   } else if (page === 'reg-beautified.html') {
+    // one-click signup page
     onAuthStateChanged(auth, user => {
       if (user) {
-        console.log('User already logged in, redirecting to dashboard');
         window.location.replace('logged-1xcopy-beautified.html');
       } else {
-        console.log('No user, setting up registration');
         hookDirectRegister();
       }
     });
   } else if (page === 'logged-1xcopy-beautified.html' || page === 'logged-menu.html') {
+    // dashboard pages
     onAuthStateChanged(auth, user => {
       if (!user) {
-        console.log('No user, redirecting to main page');
         window.location.replace('1xcopy-beautified.html');
       } else {
-        console.log('User logged in, initializing dashboard');
         initDashboard();
       }
     });
@@ -79,11 +77,7 @@ function hookMainRegister() {
   const btn = document.querySelector(
     'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
   );
-  if (!btn) {
-    console.error('Main register button not found');
-    return;
-  }
-  console.log('Hooking main register button');
+  if (!btn) return;
   btn.addEventListener('click', e => {
     e.preventDefault();
     window.location.href = 'reg-beautified.html';
@@ -95,16 +89,11 @@ function hookDirectRegister() {
   const btn = document.querySelector(
     'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
   );
-  if (!btn) {
-    console.error('Register button not found');
-    return;
-  }
-  console.log('Hooking register button');
+  if (!btn) return;
   btn.addEventListener('click', debounce(async e => {
-    console.log('Register button clicked');
     e.preventDefault();
     await registerUser();
-  }, 1000));
+  }, 1000)); // 1-second debounce
 }
 
 async function registerUser() {
@@ -137,6 +126,13 @@ async function registerUser() {
       storedPassword: localStorage.getItem('newUserPassword')
     });
 
+    console.log('Waiting for auth state...');
+    await new Promise(resolve => {
+      onAuthStateChanged(auth, user => {
+        if (user) resolve(user);
+      });
+    });
+
     console.log('Saving user profile to Firestore...');
     try {
       await setDoc(doc(db, 'users', user.uid), { username, country, currency }, { merge: true });
@@ -160,11 +156,12 @@ async function registerUser() {
 
 /* ───── 3) Dashboard init ───── */
 function initDashboard() {
-  console.log('initDashboard running');
+  // A) Log localStorage contents for debugging
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
   console.log('Checking localStorage in initDashboard:', { newUserUsername: u, newUserPassword: p });
 
+  // B) Show modal once if creds exist
   if (u && p) {
     console.log('Showing credentials modal with:', { username: u, password: p });
     showCredsModal(u, p);
@@ -175,6 +172,7 @@ function initDashboard() {
     console.log('No credentials found in localStorage, skipping modal');
   }
 
+  // C) Hook up logout
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
