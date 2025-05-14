@@ -1,4 +1,4 @@
-// auth.js – Debug build with extensive logging
+// auth.js – Debug build with preventDefault and detailed logs
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
@@ -14,10 +14,10 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
-/* ───── Module Load ───── */
-console.log("✅ auth.js module loaded on", window.location.pathname);
+/* ─── Module Load ─── */
+console.log("✅ auth.js loaded on", window.location.pathname);
 
-/* ───── Firebase Initialization ───── */
+/* ─── Firebase Init ─── */
 const firebaseConfig = {
   apiKey:            "AIzaSyBa6rufBv_LnOuPwWrDdDpwMua2n49Hczo",
   authDomain:        "bettingwebsite-6b685.firebaseapp.com",
@@ -27,96 +27,76 @@ const firebaseConfig = {
   appId:             "1:44929634591:web:99d7604a031b4a4f99a02a",
   measurementId:     "G-3PLM5LFY6X"
 };
-
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+setPersistence(auth, browserLocalPersistence)
+  .catch(err => console.error("❌ setPersistence:", err));
 
-/* Persist user session across reloads / restarts */
-setPersistence(auth, browserLocalPersistence).catch(err => {
-  console.error("❌ setPersistence error:", err);
-});
-
-/* ───── Router ───── */
+/* ─── Router ─── */
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop();
-  console.log("📄 DOMContentLoaded, current page:", page);
+  console.log("📄 DOMContentLoaded, page:", page);
 
   if (page === '1xcopy-beautified.html') {
     onAuthStateChanged(auth, user => {
-      console.log("👤 onAuthStateChanged on main:", user);
-      if (user) {
-        window.location.replace('logged-1xcopy-beautified.html');
-      } else {
-        hookRegisterButton();
-      }
+      console.log("👤 Main onAuthStateChanged:", user);
+      user
+        ? window.location.replace('logged-1xcopy-beautified.html')
+        : hookRegisterButton();
     });
 
   } else if (page === 'reg-beautified.html') {
     onAuthStateChanged(auth, user => {
-      console.log("👤 onAuthStateChanged on reg page:", user);
-      if (user) {
-        window.location.replace('logged-1xcopy-beautified.html');
-      } else {
-        hookOneClickRegister();
-      }
+      console.log("👤 Reg page onAuthStateChanged:", user);
+      user
+        ? window.location.replace('logged-1xcopy-beautified.html')
+        : hookOneClickRegister();
     });
 
   } else if (page === 'logged-1xcopy-beautified.html' ||
              page === 'logged-menu.html') {
     onAuthStateChanged(auth, user => {
-      console.log("👤 onAuthStateChanged on dashboard:", user);
-      if (!user) {
-        window.location.replace('1xcopy-beautified.html');
-      } else {
-        initLoggedInPage();
-      }
+      console.log("👤 Dashboard onAuthStateChanged:", user);
+      user
+        ? initLoggedInPage()
+        : window.location.replace('1xcopy-beautified.html');
     });
   }
 });
 
-/* ───── 1) Logged-out main – “Register” button hook ───── */
+/* ─── 1) Main page “Register” hook ─── */
 function hookRegisterButton() {
   console.log("🔎 hookRegisterButton()");
-  const btn = document.querySelector(
-    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
-  );
-  console.log("   found Register button:", btn);
-  if (!btn) {
-    console.error("❌ Register button not found on 1xcopy-beautified.html!");
-    return;
-  }
-  btn.addEventListener('click', () => {
-    console.log("➡️ Register button clicked, navigating to reg-beautified.html");
+  const btn = document.querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase');
+  console.log("   found Main Register btn:", btn);
+  if (!btn) return console.error("❌ Main Register button not found!");
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    console.log("➡️ go to reg-beautified.html");
     window.location.href = 'reg-beautified.html';
   });
 }
 
-/* ───── 2) One-click registration page ───── */
+/* ─── 2) One-click registration hook ─── */
 function hookOneClickRegister() {
   console.log("🔎 hookOneClickRegister()");
-  // Try the known selector, fallback to any button with exact text "Register"
-  let btn = document.querySelector(
-    'button.ui-button--theme-accent.ui-button--block.ui-button--uppercase'
-  );
+  let btn = document.querySelector('button.ui-button--theme-accent.ui-button--block.ui-button--uppercase');
   if (!btn) {
     btn = Array.from(document.querySelectorAll('button'))
                .find(b => b.textContent.trim().toLowerCase() === 'register');
   }
-  console.log("   found One-Click Register button:", btn);
-  if (!btn) {
-    console.error("❌ One-Click Register button not found on reg-beautified.html!");
-    return;
-  }
+  console.log("   found Reg-page button:", btn);
+  if (!btn) return console.error("❌ Reg-page button not found!");
   btn.addEventListener('click', registerUser);
 }
 
-async function registerUser() {
+async function registerUser(e) {
+  e.preventDefault();
   console.log("🔎 registerUser() called");
-  // Grab country & currency (two spans share same class)
-  const caps = Array.from(
-    document.querySelectorAll('.ui-field-select-modal-trigger__caption')
-  ).map(el => el.textContent.trim());
+
+  const caps = Array.from(document.querySelectorAll('.ui-field-select-modal-trigger__caption'))
+                    .map(el => el.textContent.trim());
   console.log("   captions:", caps);
 
   const country  = caps[0] || 'Unknown';
@@ -128,21 +108,19 @@ async function registerUser() {
     return alert('Please choose a currency first.');
   }
 
-  // Generate credentials
   const uidPart  = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
   const email    = `${username}@autogen.local`;
-  console.log(`   generated username=${username}, password=${password}, email=${email}`);
+  console.log(`   creds: ${username}/${password} → ${email}`);
 
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
-    console.log("✅ Firebase user created, uid=", user.uid);
+    console.log("✅ Auth user created uid=", user.uid);
 
     await setDoc(doc(db, 'users', user.uid), { username, country, currency });
-    console.log("✅ Firestore profile saved");
+    console.log("✅ Firestore saved profile");
 
-    // Store for modal on dashboard
     console.log("🔒 Storing creds to localStorage");
     localStorage.setItem('newUserUsername', username);
     localStorage.setItem('newUserPassword', password);
@@ -150,19 +128,14 @@ async function registerUser() {
     console.log("➡️ Redirecting to dashboard");
     window.location.replace('logged-1xcopy-beautified.html');
   } catch (err) {
-    console.error("❌ Registration error:", err);
+    console.error("❌ registerUser error:", err);
     alert('Registration failed: ' + err.message);
   }
 }
 
-/* ───── 3) Dashboard logged-in page ───── */
+/* ─── 3) Dashboard – show modal if creds are present ─── */
 function initLoggedInPage() {
-  console.log(
-    "⚙️ initLoggedInPage() running; newUserUsername=",
-    localStorage.getItem('newUserUsername')
-  );
-
-  // Show credential modal once if credentials present
+  console.log("⚙️ initLoggedInPage(); newUserUsername=", localStorage.getItem('newUserUsername'));
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
   if (u) {
@@ -171,20 +144,18 @@ function initLoggedInPage() {
     localStorage.removeItem('newUserPassword');
   }
 
-  // Hook logout buttons
-  document.querySelectorAll(
-    '.navigation-menu-section-item-button.navigation-menu-section-item__link'
-  ).forEach(btn => {
-    if (btn.textContent.trim().toLowerCase().includes('log out')) {
-      btn.addEventListener('click', () => {
-        console.log("🔒 User clicked Log out – signing out");
-        auth.signOut();
-      });
-    }
-  });
+  document.querySelectorAll('.navigation-menu-section-item-button.navigation-menu-section-item__link')
+    .forEach(btn => {
+      if (btn.textContent.trim().toLowerCase().includes('log out')) {
+        btn.addEventListener('click', () => {
+          console.log("🔒 Logging out");
+          auth.signOut();
+        });
+      }
+    });
 }
 
-/* ───── Modal to display new credentials ───── */
+/* ─── Modal overlay ─── */
 function showCredsModal(username, password) {
   console.log("🔔 showCredsModal()", username, password);
   const modal = document.createElement('div');
@@ -200,36 +171,28 @@ function showCredsModal(username, password) {
         max-width:360px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3);
         text-align:center;
       ">
-        <h2 style="margin-top:0; font-size:1.5rem; color:#333;">
-          Your New Account
-        </h2>
-        <p style="margin:0.5rem 0; font-size:1rem; color:#555;">
-          <strong>Username:</strong><br>
+        <h2 style="margin-top:0; font-size:1.5rem; color:#333;">Your New Account</h2>
+        <p style="margin:0.5rem 0; color:#555;"><strong>Username:</strong><br>
           <code style="
-            display:inline-block; margin-top:0.25rem; padding:0.2rem 0.4rem;
-            background:#f4f4f4; border-radius:4px; font-size:0.95rem;
+            display:inline-block; padding:0.2rem 0.4rem;
+            background:#f4f4f4; border-radius:4px;
           ">${username}</code>
         </p>
-        <p style="margin:0.5rem 0 1.5rem; font-size:1rem; color:#555;">
-          <strong>Password:</strong><br>
+        <p style="margin:0.5rem 0 1.5rem; color:#555;"><strong>Password:</strong><br>
           <code style="
-            display:inline-block; margin-top:0.25rem; padding:0.2rem 0.4rem;
-            background:#f4f4f4; border-radius:4px; font-size:0.95rem;
+            display:inline-block; padding:0.2rem 0.4rem;
+            background:#f4f4f4; border-radius:4px;
           ">${password}</code>
         </p>
         <div style="display:flex; gap:0.5rem; justify-content:center;">
           <button id="saveCredsBtn" style="
-            flex:1; padding:0.6rem 0; border:none; border-radius:4px;
-            background:#28a745; color:#fff; font-size:1rem; cursor:pointer;
-          ">
-            Save Details
-          </button>
+            flex:1; padding:0.6rem; background:#28a745; color:#fff;
+            border:none; border-radius:4px; cursor:pointer;
+          ">Save Details</button>
           <button id="closeCredModal" style="
-            flex:1; padding:0.6rem 0; border:1px solid #ccc; border-radius:4px;
-            background:#fff; color:#333; font-size:1rem; cursor:pointer;
-          ">
-            Go Back
-          </button>
+            flex:1; padding:0.6rem; background:#fff; color:#333;
+            border:1px solid #ccc; border-radius:4px; cursor:pointer;
+          ">Go Back</button>
         </div>
       </div>
     </div>
@@ -238,10 +201,9 @@ function showCredsModal(username, password) {
 
   modal.querySelector('#saveCredsBtn').onclick = () => {
     navigator.clipboard.writeText(`Username: ${username}\nPassword: ${password}`)
-      .then(() => alert('Credentials copied to clipboard!'))
-      .catch(() => alert('Copy failed—please copy manually.'));
+      .then(() => alert('Copied to clipboard!'))
+      .catch(() => alert('Copy failed.'));
   };
-
   modal.querySelector('#closeCredModal').onclick = () => {
     document.body.removeChild(modal);
   };
