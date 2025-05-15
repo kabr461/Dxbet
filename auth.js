@@ -126,12 +126,8 @@ async function registerUser() {
       storedPassword: localStorage.getItem('newUserPassword')
     });
 
-    console.log('Waiting for auth state...');
-    await new Promise(resolve => {
-      onAuthStateChanged(auth, user => {
-        if (user) resolve(user);
-      });
-    });
+    // ✅ Force refresh of auth token before writing to Firestore
+    await auth.currentUser.getIdToken(true);
 
     console.log('Saving user profile to Firestore...');
     try {
@@ -156,12 +152,10 @@ async function registerUser() {
 
 /* ───── 3) Dashboard init ───── */
 function initDashboard() {
-  // A) Log localStorage contents for debugging
   const u = localStorage.getItem('newUserUsername');
   const p = localStorage.getItem('newUserPassword');
   console.log('Checking localStorage in initDashboard:', { newUserUsername: u, newUserPassword: p });
 
-  // B) Show modal once if creds exist
   if (u && p) {
     console.log('Showing credentials modal with:', { username: u, password: p });
     showCredsModal(u, p);
@@ -172,7 +166,6 @@ function initDashboard() {
     console.log('No credentials found in localStorage, skipping modal');
   }
 
-  // C) Hook up logout
   document.querySelectorAll(
     '.navigation-menu-section-item-button.navigation-menu-section-item__link'
   ).forEach(btn => {
@@ -186,43 +179,20 @@ function initDashboard() {
 function showCredsModal(username, password) {
   const modal = document.createElement('div');
   modal.innerHTML = `
-    <div style="
-      position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.7); display:flex;
-      align-items:center; justify-content:center;
-      z-index:9999; font-family:Arial,sans-serif;
-    ">
-      <div style="
-        background:#fff; padding:2rem; border-radius:8px;
-        max-width:360px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3);
-        text-align:center;
-      ">
-        <h2 style="margin:0 0 1rem; font-size:1.5rem; color:#333;">
-          Your New Account
-        </h2>
+    <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:9999; font-family:Arial,sans-serif;">
+      <div style="background:#fff; padding:2rem; border-radius:8px; max-width:360px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3); text-align:center;">
+        <h2 style="margin:0 0 1rem; font-size:1.5rem; color:#333;">Your New Account</h2>
         <p style="margin:0.5rem 0; color:#555;">
           <strong>Username:</strong><br>
-          <code style="
-            display:inline-block; padding:0.2rem 0.4rem;
-            background:#f4f4f4; border-radius:4px;
-          ">${username}</code>
+          <code style="display:inline-block; padding:0.2rem 0.4rem; background:#f4f4f4; border-radius:4px;">${username}</code>
         </p>
         <p style="margin:0.5rem 0 1.5rem; color:#555;">
           <strong>Password:</strong><br>
-          <code style="
-            display:inline-block; padding:0.2rem 0.4rem;
-            background:#f4f4f4; border-radius:4px;
-          ">${password}</code>
+          <code style="display:inline-block; padding:0.2rem 0.4rem; background:#f4f4f4; border-radius:4px;">${password}</code>
         </p>
         <div style="display:flex; gap:0.5rem; justify-content:center;">
-          <button id="saveCredsBtn" style="
-            flex:1; padding:0.6rem; background:#28a745; color:#fff;
-            border:none; border-radius:4px; cursor:pointer;
-          ">Save Details</button>
-          <button id="closeCredModal" style="
-            flex:1; padding:0.6rem; background:#fff; color:#333;
-            border:1px solid #ccc; border-radius:4px; cursor:pointer;
-          ">Go Back</button>
+          <button id="saveCredsBtn" style="flex:1; padding:0.6rem; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save Details</button>
+          <button id="closeCredModal" style="flex:1; padding:0.6rem; background:#fff; color:#333; border:1px solid #ccc; border-radius:4px; cursor:pointer;">Go Back</button>
         </div>
       </div>
     </div>
