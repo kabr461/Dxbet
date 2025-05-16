@@ -203,9 +203,7 @@ function showCredsModal(username, password) {
             background:#f4f4f4; border-radius:4px;
           ">${password}</code>
         </p>
-        <p style="margin:0 0 1rem; color:#777; font-size:0.9rem;">
-          (When you log in, just enter this username; the “@autogen.local” is added for you.)
-        </p>
+        
         <div style="display:flex; gap:0.5rem; justify-content:center;">
           <button id="saveCredsBtn" style="
             flex:1; padding:0.6rem; background:#28a745; color:#fff;
