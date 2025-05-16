@@ -105,7 +105,8 @@ async function registerUser() {
   const uidPart = Math.random().toString(36).slice(2, 8);
   const username = `user_${uidPart}`;
   const password = Math.random().toString(36).slice(-8);
-  const email = `user_${uidPart}_${Date.now()}@autogen.local`;
+ const email = `user_${uidPart}@autogen.local`;
+
 
   let user;
   // retry up to 3 times on network errors
@@ -175,36 +176,49 @@ function initDashboard() {
 function showCredsModal(username, password) {
   const modal = document.createElement('div');
   modal.innerHTML = `
-    <div style="position:fixed;top:0;left:0;width:100%;height:100%;
-                background:rgba(0,0,0,0.7);display:flex;align-items:center;
-                justify-content:center;z-index:9999;font-family:Arial,sans-serif;">
-      <div style="background:#fff;padding:2rem;border-radius:8px;
-                  max-width:360px;width:90%;box-shadow:0 4px 12px rgba(0,0,0,0.3);text-align:center;">
-        <h2 style="margin:0 0 1rem;font-size:1.5rem;color:#333;">Your New Account</h2>
-        <p style="margin:0.5rem 0;color:#555;">
+    <div style="
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); display:flex;
+      align-items:center; justify-content:center;
+      z-index:9999; font-family:Arial,sans-serif;">
+      <div style="
+        background:#fff; padding:2rem; border-radius:8px;
+        max-width:360px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3);
+        text-align:center;
+      ">
+        <h2 style="margin:0 0 1rem; font-size:1.5rem; color:#333;">
+          Your New Account
+        </h2>
+        <p style="margin:0.5rem 0; color:#555;">
           <strong>Username:</strong><br>
-          <code style="display:inline-block;padding:0.2rem 0.4rem;
-                       background:#f4f4f4;border-radius:4px;">${username}</code>
+          <code style="
+            display:inline-block; padding:0.2rem 0.4rem;
+            background:#f4f4f4; border-radius:4px;
+          ">${username}</code>
         </p>
-        <p style="margin:0.5rem 0 1.5rem;color:#555;">
+        <p style="margin:0.5rem 0 1.5rem; color:#555;">
           <strong>Password:</strong><br>
-          <code style="display:inline-block;padding:0.2rem 0.4rem;
-                       background:#f4f4f4;border-radius:4px;">${password}</code>
+          <code style="
+            display:inline-block; padding:0.2rem 0.4rem;
+            background:#f4f4f4; border-radius:4px;
+          ">${password}</code>
         </p>
-        <div style="display:flex;gap:0.5rem;justify-content:center;">
-          <button id="saveCredsBtn" style="flex:1;padding:0.6rem;
-                                            background:#28a745;color:#fff;
-                                            border:none;border-radius:4px;cursor:pointer;">
-            Save Details
-          </button>
-          <button id="closeCredModal" style="flex:1;padding:0.6rem;
-                                              background:#fff;color:#333;
-                                              border:1px solid #ccc;border-radius:4px;cursor:pointer;">
-            Go Back
-          </button>
+        <p style="margin:0 0 1rem; color:#777; font-size:0.9rem;">
+          (When you log in, just enter this username; the “@autogen.local” is added for you.)
+        </p>
+        <div style="display:flex; gap:0.5rem; justify-content:center;">
+          <button id="saveCredsBtn" style="
+            flex:1; padding:0.6rem; background:#28a745; color:#fff;
+            border:none; border-radius:4px; cursor:pointer;
+          ">Save Details</button>
+          <button id="closeCredModal" style="
+            flex:1; padding:0.6rem; background:#fff; color:#333;
+            border:1px solid #ccc; border-radius:4px; cursor:pointer;
+          ">Go Back</button>
         </div>
       </div>
-    </div>`;
+    </div>
+  `;
   document.body.appendChild(modal);
 
   modal.querySelector('#saveCredsBtn').onclick = () =>
